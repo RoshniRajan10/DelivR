@@ -1,0 +1,23 @@
+{
+  "name": "delivery-system",
+  "version": "1.0.0",
+  "description": "Delivery System",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/tcp-sockets/server.js",
+    "db1": "node src/tcp-sockets/delivery-boy.js DB001",
+    "db2": "node src/tcp-sockets/delivery-boy.js DB002",
+    "c1": "node src/tcp-sockets/customer.js C001",
+    "c2": "node src/tcp-sockets/customer.js C002",
+    "pair": "node src/tcp-sockets/pair.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
