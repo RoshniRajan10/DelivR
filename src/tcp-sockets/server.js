@@ -1,31 +1,44 @@
-const net = require('net');
+const WebSocket = require('ws');
+const http = require('http');
 
-const HOST = '0.0.0.0';  // ✅ Must be 0.0.0.0 for Railway
-const PORT = process.env.PORT || 8080;  // ✅ Railway sets this automatically
+const PORT = process.env.PORT || 8000;
 
 const clients = {};
 const roles = {};
 const pairs = {};
 
-const server = net.createServer((socket) => {
-  let clientId = null;
-  console.log('🔌 New connection...');
+// Create HTTP server for WebSocket upgrade
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    status: 'ok',
+    service: 'TrackMate WebSocket Server',
+    connections: Object.keys(clients).length
+  }));
+});
 
-  socket.on('data', (data) => {
+// Create WebSocket server
+const wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+  let clientId = null;
+  console.log('🔌 New WebSocket connection');
+
+  ws.on('message', (data) => {
     try {
-      const message = JSON.parse(data.toString().trim());
+      const message = JSON.parse(data);
 
       // Register
       if (message.type === 'register') {
         clientId = message.id;
         roles[clientId] = message.role;
-        clients[clientId] = socket;
+        clients[clientId] = ws;
         console.log(`✅ Registered: ${message.role} → ${clientId}`);
         
-        socket.write(JSON.stringify({
+        ws.send(JSON.stringify({
           type: 'registered',
-          message: `You are registered as ${message.role} with ID: ${clientId}`
-        }) + '\n');
+          message: `Registered as ${message.role} with ID: ${clientId}`
+        }));
       }
 
       // Pair
@@ -35,16 +48,16 @@ const server = net.createServer((socket) => {
         console.log(`🔗 Paired: ${customerId} ↔ ${deliveryBoyId}`);
 
         if (clients[customerId]) {
-          clients[customerId].write(JSON.stringify({
+          clients[customerId].send(JSON.stringify({
             type: 'paired',
             message: `Paired with Delivery Boy: ${deliveryBoyId}`
-          }) + '\n');
+          }));
         }
         if (clients[deliveryBoyId]) {
-          clients[deliveryBoyId].write(JSON.stringify({
+          clients[deliveryBoyId].send(JSON.stringify({
             type: 'paired',
             message: `Paired with Customer: ${customerId}`
-          }) + '\n');
+          }));
         }
       }
 
@@ -55,13 +68,13 @@ const server = net.createServer((socket) => {
         );
 
         if (customerId && clients[customerId]) {
-          clients[customerId].write(JSON.stringify({
+          clients[customerId].send(JSON.stringify({
             type: 'location_update',
             deliveryBoyId: clientId,
             lat: message.lat,
             lng: message.lng,
             timestamp: new Date().toLocaleTimeString()
-          }) + '\n');
+          }));
         }
       }
 
@@ -79,27 +92,27 @@ const server = net.createServer((socket) => {
         }
 
         if (recipientId && clients[recipientId]) {
-          clients[recipientId].write(JSON.stringify({
+          clients[recipientId].send(JSON.stringify({
             type: 'message',
             from: clientId,
             role: senderRole,
             text: message.text,
             timestamp: new Date().toLocaleTimeString()
-          }) + '\n');
+          }));
         } else {
-          socket.write(JSON.stringify({
+          ws.send(JSON.stringify({
             type: 'error',
             message: '⚠️ Not paired with anyone!'
-          }) + '\n');
+          }));
         }
       }
 
     } catch (err) {
-      console.error('⚠️  Invalid message');
+      console.error('⚠️  Invalid message:', err.message);
     }
   });
 
-  socket.on('end', () => {
+  ws.on('close', () => {
     if (clientId) {
       console.log(`❌ Disconnected: ${clientId}`);
       delete clients[clientId];
@@ -110,8 +123,12 @@ const server = net.createServer((socket) => {
       });
     }
   });
+
+  ws.on('error', (err) => {
+    console.error('⚠️  WebSocket error:', err.message);
+  });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 TCP Server running on ${HOST}:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 WebSocket Server running on port ${PORT}`);
 });
