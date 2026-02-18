@@ -1,23 +1,29 @@
-const WebSocket = require('ws');
+require("dotenv").config();
 
-const SERVER_URL = process.env.SERVER_URL || 'ws://localhost:8000';
+const WebSocket = require("ws");
+
+const SERVER_URL = process.env.SERVER_URL || "ws://localhost:8000";
 
 // Change these as needed
-const CUSTOMER_ID = process.argv[2] || 'C001';
-const DELIVERY_BOY_ID = process.argv[3] || 'DB001';
+const CUSTOMER_ID = process.argv[2] || "C001";
+const DELIVERY_BOY_ID = process.argv[3] || "DB001";
 
 console.log(`🔗 Connecting to: ${SERVER_URL}`);
-console.log(`🔗 Pairing Customer ${CUSTOMER_ID} with Delivery Boy ${DELIVERY_BOY_ID}...`);
+console.log(
+  `🔗 Pairing Customer ${CUSTOMER_ID} with Delivery Boy ${DELIVERY_BOY_ID}...`,
+);
 
 const ws = new WebSocket(SERVER_URL);
 
-ws.on('open', () => {
+ws.on("open", () => {
   // Send pairing request
-  ws.send(JSON.stringify({
-    type: 'pair',
-    customerId: CUSTOMER_ID,
-    deliveryBoyId: DELIVERY_BOY_ID
-  }));
+  ws.send(
+    JSON.stringify({
+      type: "pair",
+      customerId: CUSTOMER_ID,
+      deliveryBoyId: DELIVERY_BOY_ID,
+    }),
+  );
 
   console.log(`✅ Paired successfully!`);
 
@@ -28,7 +34,7 @@ ws.on('open', () => {
   }, 500);
 });
 
-ws.on('error', (err) => {
+ws.on("error", (err) => {
   console.error(`⚠️  Error: ${err.message}`);
   console.error(`\n🔍 Make sure:`);
   console.error(`   1. Server is running`);
@@ -37,6 +43,6 @@ ws.on('error', (err) => {
   process.exit(1);
 });
 
-ws.on('close', () => {
-  console.log('👋 Connection closed');
+ws.on("close", () => {
+  console.log("👋 Connection closed");
 });
