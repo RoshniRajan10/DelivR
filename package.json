@@ -2,7 +2,7 @@
   "name": "delivery-system",
   "version": "1.0.0",
   "description": "Delivery System",
-  "main": "index.js",
+  "main": "src/tcp-sockets/server.js",
   "scripts": {
     "start": "node src/tcp-sockets/server.js",
     "db1": "node src/tcp-sockets/delivery-boy.js DB001",

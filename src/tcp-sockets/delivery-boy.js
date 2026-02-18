@@ -2,8 +2,8 @@ const net = require('net');
 const readline = require('readline');
 const { printAbovePrompt } = require('./display');
 
-const HOST = 'localhost';
-const PORT = 8080;
+const HOST = process.env.SERVER_HOST || 'ydelivery-system.app';
+const PORT = process.env.TCP_PORT || 8081;
 const DELIVERY_BOY_ID = process.argv[2] || 'DB001';
 
 const client = net.createConnection({ host: HOST, port: PORT }, () => {

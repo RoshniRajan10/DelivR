@@ -1,43 +1,62 @@
 const net = require("net");
+const http = require("http"); // ✅ Add this
 
-const HOST = "localhost";
-const PORT = 8080;
+const HOST = "0.0.0.0"; // ✅ Must be 0.0.0.0, not localhost
+const PORT = process.env.PORT || 8080; // ✅ Use Railway's PORT
 
-// Store all connected clients
-const clients = {}; // { id: socket }
-const roles = {}; // { id: 'delivery_boy' | 'customer' }
+const clients = {};
+const roles = {};
+const pairs = {};
 
-// Pairing map
-const pairs = {}; // { customerId: deliveryBoyId }
+// ✅ CREATE HTTP HEALTH CHECK SERVER
+const httpServer = http.createServer((req, res) => {
+  if (req.url === "/" || req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "ok",
+        service: "TrackMate Socket Server",
+        connections: Object.keys(clients).length,
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  } else {
+    res.writeHead(404);
+    res.end("Not Found");
+  }
+});
+
+httpServer.listen(PORT, HOST, () => {
+  console.log(`✅ HTTP Health Server running on ${HOST}:${PORT}`);
+});
+
+// ✅ TCP SOCKET SERVER (use different port)
+const TCP_PORT = process.env.TCP_PORT || 8081;
 
 const server = net.createServer((socket) => {
   let clientId = null;
-
-  console.log("🔌 New connection...");
+  console.log("🔌 New TCP connection...");
 
   socket.on("data", (data) => {
     try {
       const message = JSON.parse(data.toString().trim());
 
-      // 1. Register client
+      // Register client
       if (message.type === "register") {
         clientId = message.id;
         roles[clientId] = message.role;
         clients[clientId] = socket;
-
         console.log(`✅ Registered: ${message.role} → ${clientId}`);
+
         socket.write(
           JSON.stringify({
             type: "registered",
             message: `You are registered as ${message.role} with ID: ${clientId}`,
           }) + "\n",
         );
-
-        // Show current connections
-        printConnections();
       }
 
-      // 2. Create a pair (can be sent from server console or admin)
+      // Create pair
       if (message.type === "pair") {
         const { customerId, deliveryBoyId } = message;
         pairs[customerId] = deliveryBoyId;
@@ -45,7 +64,6 @@ const server = net.createServer((socket) => {
           `🔗 Paired: Customer ${customerId} ↔ Delivery Boy ${deliveryBoyId}`,
         );
 
-        // Notify both
         if (clients[customerId]) {
           clients[customerId].write(
             JSON.stringify({
@@ -64,15 +82,13 @@ const server = net.createServer((socket) => {
         }
       }
 
-      // 3. Delivery boy sends location
+      // Location update
       if (message.type === "location") {
-        // Find which customer is paired with this delivery boy
         const customerId = Object.keys(pairs).find(
           (cId) => pairs[cId] === clientId,
         );
 
         if (customerId && clients[customerId]) {
-          // Forward location to paired customer
           clients[customerId].write(
             JSON.stringify({
               type: "location_update",
@@ -82,32 +98,24 @@ const server = net.createServer((socket) => {
               timestamp: new Date().toLocaleTimeString(),
             }) + "\n",
           );
-
-          console.log(
-            `📍 ${clientId} → ${customerId} | Lat: ${message.lat}, Lng: ${message.lng}`,
-          );
         }
       }
 
-      // 4. Handle chat messages
+      // Chat message
       if (message.type === "message") {
         const senderId = clientId;
         const senderRole = roles[senderId];
         let recipientId = null;
 
-        // Find the paired recipient
         if (senderRole === "delivery_boy") {
-          // Delivery boy → find their paired customer
           recipientId = Object.keys(pairs).find(
             (cId) => pairs[cId] === senderId,
           );
         } else if (senderRole === "customer") {
-          // Customer → find their paired delivery boy
           recipientId = pairs[senderId];
         }
 
         if (recipientId && clients[recipientId]) {
-          // Forward message to paired person
           clients[recipientId].write(
             JSON.stringify({
               type: "message",
@@ -122,7 +130,6 @@ const server = net.createServer((socket) => {
             `💬 Message: ${senderId} → ${recipientId}: ${message.text}`,
           );
         } else {
-          // No pair found
           socket.write(
             JSON.stringify({
               type: "error",
@@ -142,30 +149,20 @@ const server = net.createServer((socket) => {
       delete clients[clientId];
       delete roles[clientId];
 
-      // Remove pair if delivery boy disconnects
       Object.keys(pairs).forEach((cId) => {
         if (pairs[cId] === clientId) {
           delete pairs[cId];
-          console.log(`🔓 Pair removed for customer: ${cId}`);
         }
       });
     }
   });
 
   socket.on("error", (err) => {
-    console.error(`⚠️  Error: ${err.message}`);
+    console.error(`⚠️  Socket error: ${err.message}`);
   });
 });
 
-function printConnections() {
-  console.log("\n📋 Current Connections:");
-  Object.keys(clients).forEach((id) => {
-    console.log(`   ${roles[id]} → ${id}`);
-  });
-  console.log("");
-}
-
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on ${HOST}:${PORT}`);
+server.listen(TCP_PORT, HOST, () => {
+  console.log(`🚀 TCP Socket Server running on ${HOST}:${TCP_PORT}`);
   console.log("Waiting for delivery boys and customers...\n");
 });
